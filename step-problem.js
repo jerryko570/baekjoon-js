@@ -35,9 +35,11 @@ function main() {
   console.log(`📘 단계 ${step} → 다음 문제: ${nextProblem}`);
   console.log("📥 문제 다운로드 중...");
 
+  // 문제 파일 생성만 하고 브랜치 생성은 하지 않음
   execSync(`node download-problem.js ${nextProblem}`, { stdio: "inherit" });
 
-  execSync(`git checkout -b step${step}/${nextProblem}`, { stdio: "inherit" });
+  // 🔥 브랜치 자동 생성 비활성화
+  // execSync(`git checkout -b step${step}/${nextProblem}`, { stdio: "inherit" });
 
   solved.push(nextProblem);
   fs.writeFileSync("solved.json", JSON.stringify(solved, null, 2));

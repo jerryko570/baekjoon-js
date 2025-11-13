@@ -1,83 +1,90 @@
-const axios = require("axios");
-const cheerio = require("cheerio");
+// download-problem.js
 const fs = require("fs");
+const axios = require("axios");
+const { execSync } = require("child_process");
 
-async function downloadProblem(id) {
-  const url = `https://www.acmicpc.net/problem/${id}`;
+async function main() {
+  const problemNumber = process.argv[2];
 
-  const { data } = await axios.get(url, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
-      "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    },
-  });
+  if (!problemNumber) {
+    console.log("❗ 사용법: node download-problem.js 1000");
+    return;
+  }
 
-  const $ = cheerio.load(data);
+  const url = `https://www.acmicpc.net/problem/${problemNumber}`;
+  console.log(`📥 Fetching problem ${problemNumber}...`);
 
-  const title = $("#problem_title").text().trim();
-  const description = $("#problem_description").text().trim();
-  const inputDesc = $("#problem_input").text().trim();
-  const outputDesc = $("#problem_output").text().trim();
+  // 1. HTML 가져오기
+  let html = "";
+  try {
+    const res = await axios.get(url);
+    html = res.data;
+  } catch (err) {
+    console.error("❌ 문제 불러오기 실패:", err.message);
+    return;
+  }
 
-  const sampleInput = $("#sample-input-1").text().trim();
-  const sampleOutput = $("#sample-output-1").text().trim();
+  // 2. 제목 추출
+  const titleMatch = html.match(/<title>(.*?)<\/title>/);
+  const title = titleMatch
+    ? titleMatch[1].replace("번 문제", "")
+    : `문제 ${problemNumber}`;
 
-  const folder = `${id}`;
-  if (!fs.existsSync(folder)) fs.mkdirSync(folder);
+  // 3. 입력 설명 추출
+  const inputDescMatch = html.match(/<h2>입력[\s\S]*?<p>([\s\S]*?)<\/p>/);
+  const inputDesc = inputDescMatch
+    ? inputDescMatch[1].replace(/<[^>]*>/g, "").trim()
+    : "입력 설명을 파싱하지 못했습니다.";
 
-  // 문제 코드 파일
-  fs.writeFileSync(
-    `${folder}/${id}.js`,
-    `// 문제 ${id}: ${title}
-// 입력 예시: node ${id}.js < input.txt
+  // 4. 입력 형태 자동 판별
+  let inputTemplate = "";
+  if (inputDesc.includes("한 줄") && inputDesc.includes("공백")) {
+    inputTemplate = `
+const fs = require("fs");
+const [A, B] = fs.readFileSync(0, "utf8").trim().split(" ").map(Number);
 
-const fs = require('fs');
-const input = fs.readFileSync(0, 'utf8').trim().split("\\n");
+// TODO: 로직 작성
+console.log(A + B);
+`;
+  } else if (inputDesc.includes("여러 줄") || inputDesc.includes("N개의 줄")) {
+    inputTemplate = `
+const fs = require("fs");
+const input = fs.readFileSync(0, "utf8").trim().split("\\n").map(Number);
 
-// TODO: 여기서 문제 해결 코드 작성
+// TODO: 로직 작성
 console.log(input);
-`
-  );
+`;
+  } else {
+    inputTemplate = `
+const fs = require("fs");
+const input = fs.readFileSync(0, "utf8").trim().split("\\n");
 
-  // 예제 파일
-  fs.writeFileSync(`${folder}/input.txt`, sampleInput || "");
-  fs.writeFileSync(`${folder}/output.txt`, sampleOutput || "");
+// TODO: 로직 작성
+console.log(input);
+`;
+  }
 
-  // 문제 설명 파일
+  // 5. 폴더 생성
+  const dir = `${problemNumber}`;
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir);
+
+  // 6. js 파일 생성
+  const template = `
+// 문제 ${problemNumber}: ${title}
+// 입력 설명: ${inputDesc}
+
+${inputTemplate}
+`;
+
+  fs.writeFileSync(`${dir}/${problemNumber}.js`, template.trim());
+  fs.writeFileSync(`${dir}/input.txt`, "");
+  fs.writeFileSync(`${dir}/output.txt`, "");
   fs.writeFileSync(
-    `${folder}/README.md`,
-    `# ${id}. ${title}
-
-## 📘 문제 설명
-${description}
-
-## 📥 입력 설명
-${inputDesc}
-
-## 📤 출력 설명
-${outputDesc}
-
-## 🔍 예제 입력
-\`\`\`
-${sampleInput}
-\`\`\`
-
-## 🔍 예제 출력
-\`\`\`
-${sampleOutput}
-\`\`\`
-`
+    `${dir}/README.md`,
+    `# ${problemNumber} - ${title}\n\n${inputDesc}`
   );
 
-  console.log(`📥 문제 ${id} 다운로드 완료!`);
+  console.log(`🎉 문제 ${problemNumber} 생성 완료!`);
 }
 
-const id = process.argv[2];
-if (!id) {
-  console.log("문제 번호를 입력하세요");
-  process.exit(1);
-}
-
-downloadProblem(id);
+main();
