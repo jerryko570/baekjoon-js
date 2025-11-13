@@ -1,0 +1,20 @@
+name: Auto PR for BOJ
+
+on:
+  push:
+    branches:
+      - boj/*
+
+jobs:
+  create_pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          commit-message: "auto: BOJ 풀이 업로드"
+          title: "BOJ 자동 PR"
+          body: "자동으로 생성된 PR입니다."
+          branch: ${{ github.ref_name }}
+          base: main
